@@ -1,0 +1,66 @@
+name: Deploy Python Middleware (CI/CD)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'config.py'
+      - 'requirements.txt'
+      - 'controllers/**'
+      - 'services/**'
+      - 'utils/**'
+      - 'sonar-project.properties'
+
+jobs:
+  deploy:
+    name: Build, Scan, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install local dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync python3-pip
+          pip install coverage
+
+      - name: SonarQube Quality Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+          unzip -q sonar-scanner.zip
+          export PATH="$PWD/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
+          sonar-scanner \
+            -Dsonar.projectKey=middleware-service \
+            -Dsonar.projectName="Middleware Service" \
+            -Dsonar.login=$SONAR_TOKEN \
+            -Dsonar.host.url=$SONAR_HOST_URL
+
+      - name: Setup SSH for Deployment
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy Files to Remote Server
+        run: |
+          rsync -avz \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env' \
+            ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_PATH }}
+
+      - name: Update Environment & Restart Service
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_IP }} "
+            cd ${{ secrets.DEPLOY_PATH }} &&
+            source venv/bin/activate &&
+            pip install -r requirements.txt &&
+            pkill -HUP gunicorn || 
+            nohup venv/bin/gunicorn --bind 0.0.0.0:5000 'app:create_app()' --workers 4 --timeout 120 >/dev/null 2>&1 &
+          "

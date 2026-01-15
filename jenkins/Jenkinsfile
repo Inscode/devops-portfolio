@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+    environment {
+        DOCKER_HUB_REPO = 'your-docker-hub/mmpro'
+        IMAGE_TAG = "v${env.BUILD_NUMBER}"
+        REGISTRY_CREDENTIALS = 'dockerhub-creds'
+        DEPLOYMENT_FILE = 'k8s/deployment.yaml'
+        ARGOCD_APP_NAME = 'mmpro-application'
+    }
+    stages {            
+        stage('Build & Test') {
+            steps {
+                sh '''
+                    python3 -m venv venv
+                    source venv/bin/activate
+                    pip install -r requirements.txt pytest pytest-cov
+                    PYTHONPATH=$(pwd) pytest --cov=app --cov-report=xml:coverage.xml
+                '''
+            }
+        }
+        stage('Build & Push Docker Image') {
+            steps {
+                script {
+                    dockerImage = docker.build("${DOCKER_HUB_REPO}:${IMAGE_TAG}")
+                    docker.withRegistry('', "${REGISTRY_CREDENTIALS}") {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+        stage('Update Manifests & GitOps Sync') {
+            steps {
+                sh "sed -i 's|image: .*|image: ${DOCKER_HUB_REPO}:${IMAGE_TAG}|' ${DEPLOYMENT_FILE}"
+                // Logic to commit changes back to Git and trigger ArgoCD API
+                echo "Triggering ArgoCD Sync for ${ARGOCD_APP_NAME}"
+            }
+        }
+    }
+}

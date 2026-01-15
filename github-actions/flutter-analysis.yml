@@ -1,0 +1,56 @@
+name: SonarQube Analysis (Flutter)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sonar:
+    name: Analyze with SonarQube
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify Dart files
+        run: |
+          echo "Dart files to be analyzed:"
+          find lib -name "*.dart" | sort
+          echo "Total Dart files found: $(find lib -name "*.dart" | wc -l)"
+
+      - name: Set up SonarScanner
+        run: |
+          sudo apt-get install -y unzip
+          wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+          unzip -q sonar-scanner-cli-5.0.1.3006-linux.zip
+          sudo mv sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner
+          echo "/opt/sonar-scanner/bin" >> $GITHUB_PATH
+
+      - name: Run SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=flutter-app-template \
+            -Dsonar.projectName="Flutter Mobile Application" \
+            -Dsonar.projectVersion=1.0 \
+            -Dsonar.sources=lib \
+            -Dsonar.exclusions=**/*.g.dart,**/*.freezed.dart,**/*.config.dart \
+            -Dsonar.language=dart \
+            -Dsonar.sourceEncoding=UTF-8 \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.login=$SONAR_TOKEN

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mmpro-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mmpro
+  template:
+    metadata:
+      labels:
+        app: mmpro
+    spec:
+      containers:
+        - name: mmpro
+          image: <YOUR_DOCKERHUB_USERNAME>/mmpro:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: FLASK_APP
+              value: app.py
+            - name: FLASK_DEBUG
+              value: "0"
+          volumeMounts:
+            - name: otp-cache
+              mountPath: /app/otp_cache
+      volumes:
+        - name: otp-cache
+          emptyDir: {}
