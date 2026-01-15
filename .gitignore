@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
+.coverage
+*.db
+
+# Node.js
+node_modules/
+dist/
+build/
+.npm
+*.log
+
+# Java/Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Environment / Secrets
+.env
+.secrets
+*.pem
+*.key
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
